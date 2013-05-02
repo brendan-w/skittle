@@ -2,7 +2,7 @@
 import os
 import socket
 
-PRODUCTION = False
+PRODUCTION = True
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
