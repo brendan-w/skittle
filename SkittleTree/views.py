@@ -28,7 +28,8 @@ def feedbackSend(request):
                 subject,
                 message,
                 'feedbackform@dnaskittle.com',
-                ['admin@newlinetechnicalinnovations.com'],
+                ['support@dnaskittle.com'],
+                #['admin@newlinetechnicalinnovations.com'],
                 # headers = {'Reply-To': contact_sender}
             )
             try:

@@ -25,6 +25,7 @@ else:
     SKITTLE_TREE_URL = "/"
 
 ADMINS = (
+    ('Skittle Admin', 'admin@dnaskittle.com'),
     ('Josiah Seaman', 'josiah@newlinetechnicalinnovations.com'),
     ('Bryan Hurst', 'bryan@newlinetechnicalinnovations.com'),
     ('Marshall Smith', 'marshall@newlinetechnicalinnovations.com'),
