@@ -1,17 +1,21 @@
 import json
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.views.decorators.cache import cache_control
 
 from SkittleCore import GraphRequestHandler
 from SkittleCore.models import RequestPacket
 from SkittleCore.Graphs.models import *
-from DNAStorage.StorageRequestHandler import GetChromosomeLength
+from DNAStorage.StorageRequestHandler import *
 from Annotations.StorageRequestHandler import GetAnnotationsChunk,GetAnnotationsList
 
 
-def browse(request, genus="homo", species="sapiens", specimen="hg18", chromosome="chrY-sample"):
+def browse(request, genus="homo", species="sapiens", specimen="hg19", chromosome="chrY"):
+    print "browse called as user " + str(request.user) + " who is authenticated:"+ str(request.user.is_authenticated())
+    if IsUserForbidden(specimen, chromosome, request.user): #also checks existance
+        return redirect('index')
+
     width = request.GET.get('width', 100)
     scale = request.GET.get('scale', 1)
     start = request.GET.get('start', 1)
@@ -19,11 +23,15 @@ def browse(request, genus="homo", species="sapiens", specimen="hg18", chromosome
     graphs = request.GET.get('graphs', "n")
     colorPalette = request.GET.get('colorPalette', 'Classic')
     fileLength = GetChromosomeLength(specimen,chromosome) 
-    context = {'availableGraphs':GraphRequestHandler.availableGraphs, 'availableAnnotations':GetAnnotationsList(specimen), "annotationStatus":json.dumps(GetAnnotationsList(specimen)), 'specimen':specimen,'chromosome':chromosome,'colorPalette':colorPalette,'width':width, "scale":scale,"start":start,"zoom":zoom,"graphs":graphs,"fileLength":fileLength,}
+    chromosomeList = GetRelatedChromosomes(specimen, request.user)
+    context = {'availableGraphs':GraphRequestHandler.availableGraphs, 'availableAnnotations':GetAnnotationsList(specimen), "annotationStatus":json.dumps(GetAnnotationsList(specimen)), 'specimen':GetSpecimen(specimen),'chromosome':chromosome,'chromosomeList':chromosomeList ,'colorPalette':colorPalette,'width':width, "scale":scale,"start":start,"zoom":zoom,"graphs":graphs,"fileLength":fileLength,}
     return render(request, 'browse.html',context)
 
 @cache_control(must_revalidate=False, max_age=3600)
 def graph(request, genus="homo", species="sapiens", specimen="hg18", chromosome="chrY-sample"):
+    if IsUserForbidden(specimen, chromosome, request.user): #also checks existance
+        return HttpResponse(status=403)
+
     state = createRequestPacket(request, specimen, chromosome)
     graphSettings = None
     if state.requestedGraph == 'h':

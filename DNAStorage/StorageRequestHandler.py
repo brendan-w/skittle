@@ -3,18 +3,24 @@ import os
 
 from django.conf import settings
 
-from models import FastaFiles, FastaChunkFiles, ImageFiles, Specimen
+from models import *
+from django.db.models import Q
 from Utilities.SkittleUtils import GetRoundedIndex
+import ProcessFasta
 
+
+def HasSpecimen(specimen):
+    has = Specimen.objects.filter(Name__iexact=specimen)[:1]
+    return has
 
 #Returns if the system contains the requested fasta file. This does NOT return full data associated with it for speed purposes.
 def HasFastaFile(specimen, chromosome):
-    has = FastaFiles.objects.filter(Specimen__Name=specimen, Chromosome=chromosome)[:1]
+    has = FastaFiles.objects.filter(Specimen__Name__iexact=specimen, Chromosome__iexact=chromosome)[:1]
     return has
 
 #Searches to see if the given fasta file is stored in the system. If so, it returns the system path to the requested chunk
 def GetFastaFilePath(specimen, chromosome, start):
-    fastaFile = FastaChunkFiles.objects.filter(FastaFile__Specimen__Name=specimen, FastaFile__Chromosome=chromosome,
+    fastaFile = FastaChunkFiles.objects.filter(FastaFile__Specimen__Name__iexact=specimen, FastaFile__Chromosome__iexact=chromosome,
                                                Start=start)[:1]
     if fastaFile:
         #Check if fasta file is stored in ram disk
@@ -29,7 +35,7 @@ def GetFastaFilePath(specimen, chromosome, start):
 
 #Return the number of characters logged for a specific chromosome    
 def GetChromosomeLength(specimen, chromosome):
-    chr = FastaFiles.objects.filter(Specimen__Name=specimen, Chromosome=chromosome)[:1]
+    chr = FastaFiles.objects.filter(Specimen__Name__iexact=specimen, Chromosome__iexact=chromosome)[:1]
 
     if chr:
         return chr[0].Length
@@ -55,7 +61,7 @@ def GetPngFilePath(request):
     #assert isinstance(request, RequestPacket)
     specimen, chromosome, graph, start, scale, charsPerLine = request.specimen, request.chromosome, request.requestedGraph, request.start, request.scale, request.width
 
-    pngFile = ImageFiles.objects.filter(FastaFile__Specimen__Name=specimen, FastaFile__Chromosome=chromosome,
+    pngFile = ImageFiles.objects.filter(FastaFile__Specimen__Name__iexact=specimen, FastaFile__Chromosome__iexact=chromosome,
                                         Start=start, Scale=scale, CharactersPerLine=charsPerLine)[:1]
 
     if pngFile:
@@ -74,7 +80,7 @@ def StorePng(request, fileObject):
     specimen, chromosome, graph, start, scale, charsPerLine = request.specimen, request.chromosome, request.requestedGraph, request.start, request.scale, request.width
 
     #Get the Related FastaFile
-    fastaFile = FastaFiles.objects.filter(Specimen__Name=specimen, Chromosome=chromosome)[:1]
+    fastaFile = FastaFiles.objects.filter(Specimen__Name__iexact=specimen, Chromosome__iexact=chromosome)[:1]
 
     if fastaFile:
         fastaFile = fastaFile[0]
@@ -104,11 +110,11 @@ def DeleteCache(graph, specimen, chromosome, start):
     #Delete database entries first
     if start and chromosome and specimen:
         start = GetRoundedIndex(start)
-        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name=specimen, FastaFile__Chromosome=chromosome, Start=start).delete()
+        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name__iexact=specimen, FastaFile__Chromosome__iexact=chromosome, Start=start).delete()
     elif chromosome and specimen:
-        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name=specimen, FastaFile__Chromosome=chromosome).delete()
+        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name__iexact=specimen, FastaFile__Chromosome__iexact=chromosome).delete()
     elif specimen:
-        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name=specimen).delete()
+        ImageFiles.objects.filter(GraphType=graph, FastaFile__Specimen__Name__iexact=specimen).delete()
     else:
         ImageFiles.objects.filter(GraphType=graph).delete()
 
@@ -132,34 +138,53 @@ def DeleteCache(graph, specimen, chromosome, start):
                 os.remove(fullpath)
 
 #Get a python object containing a unique tree that travels to the specimens and contains the chromosome files of each specimen
-def GetTreeList():
-    specimens = Specimen.objects.all()
-
+def GetTreeList(user=None):
     tree = {}
-
     #tree = {"Kingdom": {"Class": {"Genus": {"Species": {"Specimen": {"ExtendedName", "Source", "Description", "DatePublished", "Thumbnail", {"ChromosomeListing",}}}}}}}
 
+    specimens = Specimen.objects.all()
     for entry in specimens:
         #Go through all chromosomes related to this specimen and generate list
         chromosomeList = []
         chromosomes = FastaFiles.objects.filter(Specimen=entry)
-        for chr in chromosomes:
-            chromosomeList.append(chr.Chromosome)
+        for chromosome in chromosomes:
+            if chromosome.Public:
+                chromosomeList.append(chromosome.Chromosome)
+            elif user:
+                if user in chromosome.User.all():
+                    chromosomeList.append(chromosome.Chromosome)
+            else:
+                chromosomeList.append(chromosome.Chromosome)
 
-        #Gather all specimen details (including chromosomes) into list
-        details = {"ExtendedName": entry.ExtendedName, "Source": entry.Source, "Description": entry.Description,
+        if len(chromosomeList) > 0:
+            #Gather all specimen details (including chromosomes) into list
+            details = {"ExtendedName": entry.ExtendedName, "GenomeLength": entry.GenomeLength, "Source": entry.Source, "Description": entry.Description,
                    "DatePublished": entry.DatePublished, "Thumbnail": entry.Thumbnail, "Chromosomes": chromosomeList}
 
-        subtree = {entry.Kingdom: {entry.Class: {entry.Genus: {entry.Species: {entry.Name: details}}}}}
-
-        #add this generated tree to the main tree
-        tree.update(subtree)
+            if not entry.Kingdom in tree:
+                tree[entry.Kingdom] = {}
+            if not entry.Class in tree[entry.Kingdom]:
+                tree[entry.Kingdom][entry.Class] = {}
+            if not entry.Genus in tree[entry.Kingdom][entry.Class]:
+                tree[entry.Kingdom][entry.Class][entry.Genus] = {}
+            if not entry.Species in tree[entry.Kingdom][entry.Class][entry.Genus]:
+                tree[entry.Kingdom][entry.Class][entry.Genus][entry.Species] = {}
+            if not entry.Name in tree[entry.Kingdom][entry.Class][entry.Genus][entry.Species]:
+                tree[entry.Kingdom][entry.Class][entry.Genus][entry.Species][entry.Name] = {}
+            tree[entry.Kingdom][entry.Class][entry.Genus][entry.Species][entry.Name] = details
 
     return tree
 
 #Get list of chromosomes related to a specimen
-def GetRelatedChromosomes(specimen):
-    fastaFiles = FastaFiles.objects.filter(Specimen=specimen)
+def GetRelatedChromosomes(specimen, user):
+    if user.is_authenticated() : fastaFiles =  FastaFiles.objects.filter(Q(Public=True) | Q(User=user))
+    else: fastaFiles =  FastaFiles.objects.filter(Public=True)
+    if type(specimen) is unicode: 
+        fastaFiles = fastaFiles.filter(Specimen__Name__iexact=specimen)
+    else:
+        fastaFiles = fastaFiles.filter(Specimen=specimen)
+
+    fastaFiles = fastaFiles.order_by('Chromosome')
 
     chromosomes = []
 
@@ -170,7 +195,7 @@ def GetRelatedChromosomes(specimen):
 
 #Get the FastaFile related to the given specimen's chromosome
 def GetRelatedFastaFile(specimen, chromosome):
-    fastaFile = FastaFiles.objects.filter(Specimen=specimen, Chromosome=chromosome)[:1]
+    fastaFile = FastaFiles.objects.filter(Specimen=specimen, Chromosome__iexact=chromosome)[:1]
 
     if fastaFile:
         return fastaFile[0]
@@ -179,8 +204,8 @@ def GetRelatedFastaFile(specimen, chromosome):
 
 #Get the fasta chunk file at the given start position for the specified chromosome
 def GetFastaChunkFile(specimen, chromosome, start):
-    fastaChunkFile = FastaChunkFiles.objects.filter(FastaFile__Specimen__Name=specimen,
-                                                    FastaFile__Chromosome=chromosome, Start=start)[:1]
+    fastaChunkFile = FastaChunkFiles.objects.filter(FastaFile__Specimen__Name__iexact=specimen,
+                                                    FastaFile__Chromosome__iexact=chromosome, Start=start)[:1]
 
     if fastaChunkFile:
         return fastaChunkFile[0]
@@ -189,9 +214,41 @@ def GetFastaChunkFile(specimen, chromosome, start):
 
 #Get the specimen in the database with the given name
 def GetSpecimen(specimen):
-    specimen = Specimen.objects.filter(Name=specimen)[:1]
+    specimen = Specimen.objects.filter(Name__iexact=specimen)[:1]
 
     if specimen:
         return specimen[0]
     else:
         return None
+
+def GetImportProgress(specimen, fileName):
+    progress = ImportProgress.objects.filter(Specimen=specimen, FileName=fileName)[:1]
+
+    if progress:
+        return progress[0]
+    else:
+        return None
+
+def GetUserImports(user):
+    uploads = ImportProgress.objects.filter(User=user)
+    return uploads
+
+def GetUserFastas(user):
+    fastas = FastaFiles.objects.filter(User=user)
+    return fastas
+
+def HandleUploadedFile(f, attributes, user):
+    try:
+        with open(settings.SKITTLE_TREE_LOC + "DNAStorage/to_import/" + f.name, 'wb+') as destination:
+            for chunk in f.chunks():
+                destination.write(chunk)
+    except:
+        return "Error uploading file!"
+    return ProcessFasta.ImportFasta(f.name, attributes, user)
+
+def IsUserForbidden(specimen, chromosome, user):
+    chromosome = GetRelatedFastaFile(GetSpecimen(specimen), chromosome)
+
+    if chromosome and (chromosome.Public or chromosome.User == user):
+        return False
+    return True

@@ -1,11 +1,42 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.core.mail import EmailMessage
+from django.contrib.auth import login, authenticate
 
+from SkittleCore.models import SkittleUser
+from SkittleCore.forms import UserCreationForm
 
 def home(request):
     return render(request, 'home.html')
 
+def learn(request):
+    print "learn called as user " + str(request.user) + " who is authenticated:"+ str(request.user.is_authenticated())
+    if request.user.is_authenticated():
+        request.user.NewUser = False
+        request.user.save()
+    return HttpResponseRedirect('/browse/homo/sapiens/hg19/chrY/?graphs=bn&start=1468365&scale=1&width=105&annotation=gencode#learn')
+
+def loggedInRedirect(request):
+    print "loggedInRediect called as user " + str(request.user) + " who is authenticated:"+ str(request.user.is_authenticated())
+    if request.user.is_authenticated() and not request.user.NewUser:
+        return HttpResponseRedirect('/discover/')
+    else:
+        return learn(request)
+
+def createUser(request):
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            newUser = SkittleUser.objects.create_user(**form.cleaned_data)
+            print "created new user " + str(request.POST['Email']) + " who is authenticated:"+ str(request.user.is_authenticated())
+
+            user = authenticate(username=request.POST['Email'],password=request.POST['password1'])
+            login(request,user)
+            print "should have logged in new user " + str(user) + " who is authenticated:"+ str(request.user.is_authenticated())
+            return HttpResponseRedirect('/learn/')
+    else:
+        form = UserCreationForm()
+    return render(request, 'createUser.html',{'form' : form})
 
 def feedbackSend(request):
     if request.is_ajax() or request.method == 'POST':

@@ -18,11 +18,14 @@ import sys
 import socket
 
 PRODUCTION = True
+HOSTNAME = socket.gethostname()
 
-if PRODUCTION and not socket.gethostname().startswith('nyx'):
+if PRODUCTION and not HOSTNAME.startswith('nyx'):
     sys.path.append('/var/www/skittle')
-elif socket.gethostname().startswith('nyx'):
+    os.environ['HTTPS'] = "on"
+elif HOSTNAME.startswith('nyx'):
     sys.path.append('/var/www/skittle-development')
+    os.environ['HTTPS'] = "on"
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SkittleTree.settings")
 
