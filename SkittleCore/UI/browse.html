@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block pageTitle %}{{ specimen }} | DNASkittle{% endblock %}
+{% block pageTitle %}{{ specimen.ExtendedName }} | DNASkittle{% endblock %}
 {% block styles %}
-    <link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/browser.css">
-    <link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/popover.css">
+	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/browser_layout.css">
+	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/browser_style.css">
     <link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/simple-slider.css">
     <style type="text/css">
 
@@ -10,7 +10,6 @@
 {% endblock %}
 {% block scripts %}
     <script src="/browse/state.json"></script>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
     <script src="{{ STATIC_URL }}js/simple-slider.min.js"></script>
     <script src="{{ STATIC_URL }}js/contactform.js"></script>
     <script src="{{ STATIC_URL }}js/md5.js"></script>
@@ -19,7 +18,7 @@
     <script src="{{ STATIC_URL }}js/draw_canvas.js"></script>
     <script type="text/javascript">
 	    xOffset = 0
-	    specimen = "{{ specimen }}"
+	    specimen = "{{ specimen.Name }}"
 	    chromosome = "{{ chromosome }}"
 	    // var getParams = JSON.parse('{"' + decodeURI(window.location.search.replace(/&/g, "\",\"").replace(/=/g,"\":\"")) + '"}')
 	    colorPalette = "{{ colorPalette }}"
@@ -28,6 +27,30 @@
 	    skixelsOnScreen = toSkixels($('#canvasContainer').height())*{{ width }};
 
     </script>
+{% endblock %}
+
+{% block header %}
+	<p class="taxonomy">
+		<a href="{% url 'index' %}">Genome Library</a> &gt; 
+		<a href="{% url 'index' %}?kingdom={{ specimen.Kingdom }}">{{ specimen.Kingdom }}</a> &gt; 
+		<a href="{% url 'index' %}?kingdom={{ specimen.Kingdom }}&amp;class={{ specimen.Class }}">{{ specimen.Class }}</a> &gt; 
+		<a href="{% url 'index' %}?kingdom={{ specimen.Kingdom }}&amp;class={{ specimen.Class }}&amp;genus={{ specimen.Genus }}">{{ specimen.Genus }}</a> &gt; 
+		<a href="{% url 'index' %}?kingdom={{ specimen.Kingdom }}&amp;class={{ specimen.Class }}&amp;genus={{ specimen.Genus }}&amp;species={{ specimen.Species }}">{{ specimen.Species }}</a></p>
+	<h2>{% firstof specimen.ExtendedName "" %} ({{ specimen.Name }}) 
+		<span class="chromosomeName">&gt; {{ chromosome }}
+		
+	{% if chromosomeList|length > 1 %}
+	<div class="popover arrow-top-left{% if chromosomeList|length > 10 %} longlist{% endif %}" id="chromosomeList">
+		<div>
+		<ul>
+			{% for c in chromosomeList %}
+				{% if c != chromosome %}
+			<li><a href="../{{ c }}">{{ c }}</a></li>
+				{% endif %}
+			{% endfor %}
+		</ul>
+		</div>
+	</div>{% endif %}</span></h2>
 {% endblock %}
 
 {% block content %}
@@ -106,8 +129,11 @@
 			<li class="radio-tools" data-tool="Annotate"><img src="{{STATIC_URL}}gfx/icons/39.png" width="20" height="20">Annotate</li> -->
 			<li id="link-here"><img src="{{STATIC_URL}}gfx/icons/link.png" width="20" height="20">Link Here</li>
 			<!-- <li><img src="{{STATIC_URL}}gfx/icons/camera.png" width="20" height="20">Screenshot</li> -->
-			<!-- <li class="bottom"><img src="{{STATIC_URL}}gfx/icons/cog.png" width="20" height="20">Settings</li> -->
-			<li id="bug-report" class="bottom"><img src="{{STATIC_URL}}gfx/icons/bug.png" width="20" height="20">Bug Report</li>
+			<div class="bottom">
+
+			<li id="bug-report"><img src="{{STATIC_URL}}gfx/icons/bug.png" width="20" height="20">Bug Report</li>
+			<!-- <li><img src="{{STATIC_URL}}gfx/icons/cog.png" width="20" height="20">Settings</li> -->
+			</div>
 		</ul>
 	</div>
 	<div id="dials">
@@ -168,6 +194,8 @@
 		<input type="submit" value="Send Feedback">
 	</form>
 	</div>
+
+
 	<script type="text/javascript">
     var cc, c, b, a;
     var isDrag = false;
@@ -203,13 +231,14 @@
 		cc = document.getElementById('c') //visible canvas - scale will be 3*zoom
 		c = cc.getContext("2d");
 	    var bb = document.createElement('canvas'); //scratch canvas
-	    bb.height = 1000
-	    bb.width = 5000
+	    bb.height = 1024
+	    bb.width = 1024
 	    b = bb.getContext("2d");
 	    var aa = document.createElement('canvas');
-	    aa.height = 10000
-	    aa.width = 1050
+	    aa.height = 1024
+	    aa.width = 1024
 	    a = aa.getContext("2d");
+
 
 	    // if graphs are specified in the url set their visibility
 	    var initialGraphs = "{{ graphs }}".split('')
@@ -246,16 +275,26 @@
 
 	    document.onkeydown = keyListener; 
 	    
-	    cc.onselectstart = function () { return false; } //fixes a problem where double clicking causes text to get selected on the canvas
+	    cc.onselectstart = function (e) { e.preventDefault(); return false; } //fixes a problem where double clicking causes text to get selected on the canvas
 	    cc.onmousedown = mouseDown;
 	    cc.onmousemove = mouseMove;
 	    cc.onmouseup = mouseUp;
 	    cc.onmousewheel = mouseWheel;
 	    $('#dials li').on('mousewheel',mouseWheelDials)
 
+	    cc.addEventListener("touchstart", processTouchEvent, false)
+	    cc.addEventListener("touchmove", processTouchEvent, false)
+	    cc.addEventListener("touchend", processTouchEvent, false)
+
 	contactForm();
 
+		$('.chromosomeName').on('click',function(){
+			$('#chromosomeList').toggle();
+		})
 
+		$('#loginLink').on('click',function(){
+			$('#login').show();
+		})
 
 
 	})

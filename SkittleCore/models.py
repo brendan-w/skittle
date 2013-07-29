@@ -5,21 +5,22 @@ Created on Nov 30, 2012
 '''
 from django.db import models
 from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+from django.utils.http import urlquote
+from django.core.mail import send_mail
 
 from FastaFiles import readFile
 import DNAStorage.StorageRequestHandler as StorageRequestHandler
 
 
 chunkSize = settings.CHUNK_SIZE
+
 '''
 This is the single global state packet that defines a view state in Skittle.  
 This state packet is equivalent to an URL or a request from the Skittle website.
 '''
-
-
-class RequestPacket(models.Model):
-    #TODO: user = models.ForeignKey(User)
-    #TODO: session
+class basePacket(models.Model):
     specimen = models.CharField(max_length=200, default='hg18')
     chromosome = models.CharField(max_length=200, default='chrY-sample')
     '''It is debatable whether or not the sequence should be stored in the state
@@ -38,7 +39,7 @@ class RequestPacket(models.Model):
                                     default='Classic')
     width = models.IntegerField(default=None, null=True)
     scale = models.IntegerField(default=None, null=True)
-    '''Internally, start begins at 0.  Biologists count indices starting at 1, so this number 
+    '''Internally, start begins at 0.  Biologists count indices starting at 1, so this number
     is 1 less than the number displayed on the website.  This also means that you should print
     index+1 whenever you are writing user readable output.'''
     start = models.IntegerField(default=None, null=True)
@@ -48,6 +49,18 @@ class RequestPacket(models.Model):
     searchStart = models.IntegerField(default=1)
     searchStop = models.IntegerField(default=1)
 
+    class Meta:
+        abstract = True
+
+class StatePacket(basePacket):
+    # NOTE: We can store other state items that come up here.
+    # Session management and stuff. This will be nice when the Social aspect comes up.
+    userId = models.IntegerField(unique=True)
+
+    class Meta:
+        abstract = False
+
+class RequestPacket(basePacket):
     def copy(self):
         c = RequestPacket()
         #copy everything except the sequence
@@ -85,7 +98,7 @@ class RequestPacket(models.Model):
             self.seq = '' #ensure that seq is at least a string object
         self.start = self.start + len(self.seq) # jump to the end of the current sequence  (+ chunkSize)
 
-        #print "Requesting",self.specimen, self.chromosome, self.start 
+        #print "Requesting",self.specimen, self.chromosome, self.start
         sequence = readFile(self)# see if there's a file that begins where you end, this will stop on a partial file
         if sequence is not None:
             self.seq = self.seq + sequence #append two sequences together
@@ -114,15 +127,83 @@ class RequestPacket(models.Model):
             print "Done reading files"
         self.length = len(self.seq)
 
+    class Meta(basePacket.Meta):
+        managed = False
 
-class StatePacket(RequestPacket):
-    specimen = 'hg18'
-    chromosome = 'chrY-sample'
-    width = 200
-    scale = 1
-    start = 1
-    requestedGraph = 'n'
+class SkittleUserManager(BaseUserManager):
+    def create_user(self, Email=None, password1=None, FirstName=None, LastName=None, **extra_fields):
+        if not Email:
+            raise ValueError("Users must have an email address")
+        if not FirstName:
+            raise ValueError("Users must have a first name")
+        if not password1:
+            raise ValueError("Users must set a password")
 
+        Email = SkittleUserManager.normalize_email(Email)
+        user = SkittleUser(email=Email, FirstName=FirstName, LastName=LastName)
+
+        user.set_password(password1)
+        user.save()
+        return user
+
+    def create_superuser(self, Email=None, password=None, FirstName="Admin", LastName=None, **extra_fields):
+        if not Email:
+            raise ValueError("Users must have an email address")
+        if not FirstName:
+            raise ValueError("Users must have a first name")
+        if not password:
+            raise ValueError("Users must set a password")
+
+        user = self.create_user(Email, password, FirstName, LastName)
+        user.IsAdmin = True
+        user.is_superuser = True
+        user.save()
+        return user
+
+class SkittleUser(AbstractBaseUser, PermissionsMixin):
+    email = models.EmailField(verbose_name='Email Address', max_length=255, unique=True, db_index=True, db_column="Email", help_text='Your email address will be treated as a Username for this site.',)
+    FirstName = models.CharField(verbose_name='First Name', max_length=255,)
+    LastName = models.CharField(verbose_name='Last Name', max_length=255, null=True, blank=True,)
+    IsAdmin = models.BooleanField(verbose_name='Admin Status', default=False, help_text='Designates whether this user is an Admin/On Staff or not.',)
+    IsActive = models.BooleanField(verbose_name='Active Status', default=True,)
+    DateJoined = models.DateTimeField(verbose_name='Date joined', default=timezone.now)
+    NewUser = models.BooleanField(verbose_name='New user', default=True, help_text='Designates if this is the user\'s first visit to the site or not.')
+
+    is_staff = IsAdmin
+    is_active = IsActive
+
+    objects = SkittleUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    class Meta:
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+
+    def get_absolute_url(self):
+        return "/users/%s/" % urlquote(self.email)
+
+    def get_full_name(self):
+        full_name = '%s %s' % (self.FirstName, self.LastName)
+        return full_name.strip()
+
+    def get_short_name(self):
+        return self.FirstName
+
+    def email_user(self, subject, message, from_email=None):
+        send_mail(subject, message, from_email, [self.email])
+
+    @property
+    def is_staff(self):
+        "Is the user a member of the admin team?"
+        return self.IsAdmin
+
+    @property
+    def is_active(self):
+        return self.IsActive
+
+    State = models.OneToOneField(StatePacket, null=True)
 
 class ProcessQueue(models.Model):
     Specimen = models.CharField(max_length=200)

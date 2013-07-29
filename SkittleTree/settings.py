@@ -5,6 +5,7 @@ import socket
 PRODUCTION = True
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
+HOSTNAME = socket.gethostname()
 
 #--------------------
 
@@ -12,14 +13,14 @@ CHUNK_SIZE = 65536
 
 #--------------------
 
-if PRODUCTION and not socket.gethostname().startswith('nyx'):
+if PRODUCTION and not HOSTNAME.startswith('nyx'):
     SKITTLE_TREE_LOC = "/var/www/skittle/"
 
-    SKITTLE_TREE_URL = "http://dnaskittle.com/"
-elif socket.gethostname().startswith('nyx'):
+    SKITTLE_TREE_URL = "https://dnaskittle.com/"
+elif HOSTNAME.startswith('nyx'):
     SKITTLE_TREE_LOC = "/var/www/skittle-development/"
 
-    SKITTLE_TREE_URL = "http://skittle.newlinetechnicalinnovations.com/"
+    SKITTLE_TREE_URL = "https://skittle.newlinetechnicalinnovations.com/"
 else:
     SKITTLE_TREE_LOC = os.getcwd().replace("\\", "/") + "/"
     SKITTLE_TREE_URL = "/"
@@ -33,8 +34,12 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
-if PRODUCTION and not socket.gethostname().startswith('nyx'):
-    #TODOL mysql_pool
+AUTH_USER_MODEL = 'SkittleCore.SkittleUser'
+
+DEFAULT_FROM_EMAIL = "info@dnaskittle.com"
+
+if PRODUCTION and not HOSTNAME.startswith('nyx'):
+    #TODO: mysql_pool
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
@@ -58,7 +63,18 @@ else:
         }
     }
 
+
 DATABASE_WAIT_TIMEOUT = 28800
+
+if PRODUCTION or HOSTNAME.startswith('nyx'):
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    ENABLE_SSL = True
+    SESSION_SAVE_EVERY_REQUEST = True
+    SESSION_COOKIE_NAME = 'DNASkittle'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -109,7 +125,9 @@ STATICFILES_DIRS = (
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
+    SKITTLE_TREE_LOC + 'SkittleTree/UI/assets/',
     SKITTLE_TREE_LOC + 'SkittleCore/UI/assets/',
+    SKITTLE_TREE_LOC + 'DNAStorage/UI/assets/',
 )
 
 # List of finder classes that know how to find static files in
@@ -162,6 +180,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.core.context_processors.static",
     "django.core.context_processors.tz",
     "django.contrib.messages.context_processors.messages",
+    "django.core.context_processors.request",
     "SkittleTree.context_processors.global_vars",
 )
 

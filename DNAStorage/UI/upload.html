@@ -3,8 +3,6 @@
 {% load nti_filters %}
 {% block pageTitle %}DNASkittle|Select a Genome{% endblock %}
 {% block styles %}
-	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/browser.css">
-	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/popover.css">
 	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/jquery-ui-1.10.1.custom.min.css">
 	<style type="text/css">
 		.container {
@@ -32,10 +30,11 @@
 			margin-bottom: 0.2em;
 			font-weight: 300;
 			color:#fda;
+			word-wrap: break-word;
 		}
 		#uploadForm {
 			width:450px;
-			line-height: 2.2;
+			/*line-height: 2.2;*/
 			float: left;
 		}
 		#info {
@@ -53,7 +52,8 @@
 		input {
 			font-size: 1.1em;
 		}
-		input[type="text"] {
+		input[type="text"],textarea {
+			display:inline-block;
 			background: #333;
 			color:#fff;
 			border: 1px solid #444;
@@ -126,71 +126,104 @@
 			margin-left: 1em;
 			vertical-align: middle;
 		}
+		#nextButton {
+			float: right;
+			margin-top: 1em;
+			margin-right: 1em;
+			clear:left;
+		}
+		#page1, #page2 {
+			display: none;
+		}
+		#page1.active, #page2.active {
+			display: block;
+		}
 
 	</style>
 	{% endblock %}
 	{% block scripts %}
-	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 	<script src="{{ STATIC_URL }}js/jquery-ui-1.10.1.custom.min.js"></script>
 	<script src="{{ STATIC_URL }}js/taxonomy.json"></script>
+	<script src="taxonomy.json"></script>
 	<script type="text/javascript">
-
-
+	window.setInterval(function(){
+		$.getJSON('#',updateStatus)
+	},5000)
 	</script>
 	{% endblock %}
 {% block content %}
 
 	<div class="container">
+		{% if status %}
+		<div class="message {{ status }}">{{ message }}</div>
+		{% endif %}
 		<h2>Upload a Genome</h2>
-		<form id="uploadForm">
+		<form id="uploadForm" action="upload" method="post">
+			{% csrf_token %}
+			<div id="page1" class="active">
 			<div class="vertical-grid">
-			<label for="fastaPublic">Availability:</label>
-			<input type="radio" name="fastaPublic" value="public" checked>Public
-			<input type="radio" name="fastaPublic" value="private">Private
+			<label for="availability">Availability:</label>
+			<input type="radio" name="isPublic" value="True" checked>Public
+			<input type="radio" name="isPublic" value="">Private
 			<br>
-			<label for="fastaName">Genome Name:</label><input type="text" name="fastaName" placeholder="(e.g. Human Genome)" class="primary"><br>
-			<label for="fastaSpecimen">Specimen Name:</label><input type="text" name="fastaSpecimen" placeholder="(e.g. hg19)" class="primary"><br>
-			<label for="fastaSource">Source:</label><input type="text" name="fastaSource" value=
-			"{{ user.name }}"><br>
-			<label for="fastaDate">Date Sequenced:</label><input type="text" name="fastaDate" placeholder="mo. year"><br>
+			<label for="specimenName">Specimen Name:</label><input type="text" id="specimenName" name="specimenName" placeholder="(e.g. hg19)" class="primary"><br>
+			<label for="genomeName">Genome Name:</label><input type="text" id="genomeName" name="genomeName" placeholder="(e.g. Human Genome)" class="primary"><br>
+			<label for="source">Source:</label><input type="text" id="source"  name="source" value="{{ user.get_full_name }}"><br>
+			<label for="dateSequenced">Date Sequenced:</label><input type="text" id="dateSequenced" name="dateSequenced" placeholder="mo. year"><br>
+			<label for="description" style="vertical-align:top">Description:</label><textarea id="description" name="description"></textarea><br>
 		</div>
 			<h4>Taxonomy:</h4>
+			<input type="hidden" id="Kingdom" name="Kingdom">
+			<input type="hidden" id="Class" name="Class">
+			<input type="hidden" id="Genus" name="Genus">
+			<input type="hidden" id="Species" name="Species">
 			<input type="checkbox" name="uncategorized" id="uncategorized" checked><label for="uncategorized">Uncategorized</label>
 			<div id="taxonomyBuilder" style="display:none;">
 				
 			</div>
-
-
-			<h3>Chromosomes:</h3>
-			<div id="chromosomes">
-			<div class="chromosome">
-				<input type="text" name="chrName" placeholder="Name" class="primary">
-				<input type="button" value="upload file..." class="">
+			<a href="#" class="button primary" id="nextButton">Next &gt;</a>
 			</div>
+			<div id="page2">
+			<h3>Select Chromosome Files:</h3>
+			<input type="file" class="" multiple="multiple" id="fastafiles">
+			<br>
+			<div id="chromosomeList"></div>
+			<br>
+			<a href="#" id="prevButton" class="button">&lt; Back</a>
+			<input type="submit" class="button primary" value="Upload">
 			</div>
 		</form>
 		<div id="info">
 			<h3>Info</h3>
-			<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
-			tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
-			quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
-			cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
-			proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-			^.*(Phylum:|Order:|Family:|Subclass:|Infraclass:|Tribe:).*[\r\n]
-			^.*(Genus:  )(\w*) 
-			{"$2"},
+			<p>Please wait for your fasta files to finish uploading before closing the browser window. Once the upload is
+				complete the server will begin processing the files and preparing them for display. This could take 
+				a few minutes to several hours depending on the file size.</p>
+			<p>If you are working with a single chromosome organism you may upload different strains and assemblies as chromosomes.</p>
+			<p>If you select the Private Avaliablity option, the chromosomes you upload will only be available to you when you log in. Otherwise they will be visible to all users of DNASkittle.  Please make sure you have the rights to the files you upload. If you have questions about uploading fasta files, please contact <a href="mailto:support@dnaskittle.com">support@dnaskittle.com</a></p>
 		</div>
 	</div>
 	<div id="templates">
 		<div class="chromosome">
-			<input type="text" name="chrName" placeholder="Name" class="primary">
-			<input type="button" value="upload file..." class="">
+			<h4></h4>
+			<div class="progress"><div class="progressbar"></div><div class="progresspercent"></div></div>
 		</div>
 	</div>
-	
+
+
 	<script type="text/javascript">
-	var levels = ['Kingdom','Class','Genus','Species']
+	$("#nextButton").on("click",function(){
+		$('#page1').removeClass('active');
+		$('#page2').addClass('active');
+		$('input[type=submit]').val('Upload to '+$('#specimenName').val())
+	})
+	$("#prevButton").on("click",function(){
+		$('#page2').removeClass('active');
+		$('#page1').addClass('active');
+	})
+
+	var levels = ['Kingdom','Class','Genus','Species'];
+	var specimens = {};
+	var specimenList = [];
 	$(function() {
 		$('#uncategorized').on('click',function(){
 			if ($(this).is(':checked')) {
@@ -210,16 +243,56 @@
 			$(this).parent().remove()
 		})
 
+		setupTypeaheads()
+
+		$("#specimenName").first().autocomplete({
+							source:specimenList, 
+							minLength:0, 
+							select:autoFillForm
+						})
+
 	})
+	var autoFillForm = function(event, ui) { 
+		$(this).val(ui.item.label);
+		specimen = specimens[ui.item.label];
+		$('#genomeName').val(specimen.ExtendedName);
+		$('#source').val(specimen.Source);
+		$('#dateSequenced').val(specimen.DatePublished);
+		$('#description').val(specimen.Description);
+		$('#Kingdom,#Class,#Genus,#Species').val("");
+		$('#taxonomyBuilder').empty();
+		$('#taxonomyBuilder').append('<span id="level0" class="taxonomy">'+specimen.kingdom +'</span><span id="level1" class="taxonomy">'+specimen.class +'</span><span id="level2" class="taxonomy">'+specimen.genus +'</span><span id="level3" class="taxonomy">'+specimen.species +'</span>');
+		if ($('#uncategorized:checked').length>0) $('#uncategorized').trigger('click');
+	}
+	var setupTypeaheads = function() {
+		$.extend(taxonomy,currentTaxonomy)
+
+		$.each(currentTaxonomy, function(tempKingdom,v) {
+			$.each(v,function(tempClass,v){
+				$.each(v, function(tempGenus,v){
+					$.each(v, function(tempSpecies,v){
+						$.each(v, function(tempSpecimen,v){
+							v.kingdom = tempKingdom;
+							v.class = tempClass;
+							v.genus = tempGenus;
+							v.species = tempSpecies;
+							specimens[tempSpecimen] = v;
+							specimenList.push(tempSpecimen);
+						})
+					})
+				})
+			})
+		})
+	}
 	var getTypeaheadValues = function(level) {
-		var taxonomy = currentTaxonomy
+		var levelList = taxonomy
 		for (var i=0;i<level;i++) {
-			taxonomy = taxonomy[$('#taxonomyBuilder #level'+i).text()]
-			if (!taxonomy) return []
+			levelList = levelList[$('#taxonomyBuilder #level'+i).text()]
+			if (!levelList) return []
 		}
-		if (!taxonomy) return []
+		if (!levelList) return []
 		var list = []
-		$.each(taxonomy,function(i,v){
+		$.each(levelList,function(i,v){
 			list.push(i)
 		})
 		return list
@@ -231,21 +304,23 @@
 			.autocomplete({source:getTypeaheadValues(level),minLength: 0})
 			.blur(function() {
 				if ($(this).val().length>0) {
-					var levelSpan = $('<span id="level'+level+'" class="taxonomy">'+$(this).val()+'</span>')
+					var levelSpan = $('<span id="level'+level+'" class="taxonomy">'+$(this).val()+'</span>');
 					levelSpan
 						.insertAfter($(this))
-						.on('click',function(){
-							$('#taxonomyBuilder input').remove()
-							var level = $(this).prop('id').slice(-1)
-							addLevel(level)
-						})
 						.nextAll().remove()
 					$(this).remove()
 					level++
 					if (level < 4) addLevel(level);
 				}
 			})
+			.on('autocompleteselect', function(event, ui) { $(this).val(ui.item.label).trigger('blur'); }) // when you click on the list it should progress you to the next thing
 	}
+	$('#taxonomyBuilder').on('click','span.taxonomy',function(){
+							$('#taxonomyBuilder input').remove();
+							var level = $(this).prop('id').slice(-1);
+							addLevel(level);
+						})
+
 	var addLevelInput = function(level) {
 		var value = ($('#taxonomyBuilder #level'+level).length>0) ? $('#taxonomyBuilder #level'+level).text() : "";
 		var levelInput = $('<input type="text" id="level'+level+'" placeholder="' + levels[level] + '" value="'+value+'">')
@@ -258,6 +333,87 @@
 			$('#taxonomyBuilder').append(levelInput)
 		}
 		return levelInput;
+	}
+
+	$('#uploadForm').on('submit',function(e){
+		e.preventDefault();
+		$('#page2 input[type="submit"] #page2 input[type="file"]').attr('disabled','disabled');
+		for (i=0;i<4;i++) {
+			$('#'+levels[i]).val( $('#level'+i).html() )
+		}
+		$('.chromosome h4').each(function(){
+			$(this).find('input').attr('type','hidden')
+			$(this).append($(this).find('input').val())
+		})
+        ajaxFile($('#fastafiles')[0],0);
+	})
+
+	$('#fastafiles').on('change', function(e) {
+		$('#chromosomeList .chromosome').each(function(){
+			if ($(this).find('input[type="text"]').length>0) $(this).remove()
+		});
+		$.each(this.files,function(i,v){
+			var t = $('#templates .chromosome')
+					.clone()
+					.attr('id','chr-'+i)
+					.attr('data-filename',v.name)
+			t.find('h4').html('<input type="text" id="inputchr-'+i+'" name="inputchr-'+i+'" value="' + parseChromosomeFilename(v.name)+'" />')
+			$('#chromosomeList').append(t);
+		})
+        // ajaxFile(this,0);
+	});
+	var ajaxFile = function(fileinput,i){
+		if (!fileinput.files[i]) return false;
+
+        var formData = new FormData(document.getElementById('uploadForm'));
+	    var file = fileinput.files[i];
+	    formData.append('file',file);
+	    formData.append('chromosomeName',$('#inputchr-'+i).val());
+
+	    var xhr = new XMLHttpRequest();
+	    xhr.addEventListener('progress', function(e) {
+	        var done = e.position || e.loaded, total = e.totalSize || e.total;
+            $('#chr-'+i+' .progressbar').width(round(100*done/total) + '%');
+	        console.log('xhr progress: ' + (Math.floor(done/total*1000)/10) + '%');
+	    }, false);
+	    if ( xhr.upload ) {
+	        xhr.upload.onprogress = function(e) {
+	            var done = e.position || e.loaded, total = e.totalSize || e.total;
+	            $('#chr-'+i+' .progressbar').width(round(100*done/total) + '%');
+	            console.log('xhr.upload progress: ' + done + ' / ' + total + ' = ' + (Math.floor(done/total*1000)/10) + '%');
+	        };
+	    }
+	    xhr.onreadystatechange = function(e) {
+	        if ( 4 == this.readyState ) {
+	            if (this.status == 200 ) $('#chr-'+i+' .progressbar').html('upload complete');
+	            else $('#chr-'+i+' .progressbar').html('error').css('background','#a00');
+	            console.log(['xhr upload complete', e]);
+	            // try {updateStatus($.parseJSON(this.response))}
+	            // catch (e) { updateStatus() }
+	        	ajaxFile(fileinput,++i);
+	        }
+	    };
+	    xhr.open('post', "upload", true);
+	    xhr.send(formData);
+
+	}
+	
+	var updateStatus = function(status) {
+		if(!status) return false;
+		console.log(status);
+		$.each(status,function(i,v){
+			if (i == "null") return	false;
+			$outputLocation = $('.chromosome[data-filename="'+i+'"] .progressbar');
+
+			if (v.IsWorking == "True") $outputLocation.html('processing...').css('background','#3c3');
+			else if (v.Success == "True") {
+				$outputLocation.html('Ready for viewing!').css('background','#0a0');
+				$('.chromosome[data-filename="'+i+'"] h4')
+					.html('<a href="/browse/' + $('#Genus').val() +"/" + $('#Species').val() + "/" + v.Specimen + "/" + v.Chromosome +'">' + v.Chromosome + "</a>")
+			}
+			else $outputLocation.html('processing error: '+v.Message).css('background','#a00');
+			
+		})
 	}
 	</script>
 

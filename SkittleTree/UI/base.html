@@ -4,10 +4,12 @@
 	<title>{% block pageTitle %}DNASkittle Alpha Preview{% endblock %}</title>
 
 	<meta http-equiv="X-UA-Compatible" content="chrome=1">
+	<meta name="viewport" content="width=960, height=device-height" />
 
+	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/base_layout.css">
+	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/basic_style.css">
+    <link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/popover.css">
 	{% block styles %}
-	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/browser.css">
-	<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/popover.css">
 	<style type="text/css">
 
 	</style>
@@ -18,13 +20,9 @@
     <script src="{{STATIC_URL}}js/excanvas.js"></script>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js"></script>
 <![endif]-->
+	<script src="{{ STATIC_URL }}js/jquery-2.0.1.min.js"></script>
+	<script src="{{ STATIC_URL }}js/utility.js"></script>
 	{% block scripts %}
-	<script src="/browse/state.json"></script>
-	<script src="annotation.json"></script>
-	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-	<script src="{{STATIC_URL}}js/utility.js"></script>
-	<script src="{{STATIC_URL}}js/interface.js"></script>
-	<script src="{{STATIC_URL}}js/draw_canvas.js"></script>
 	<script type="text/javascript">
 
 
@@ -40,17 +38,28 @@
 	 })});
 <![endif]-->
 {% endblock %}
-	{% block header %}
 	<h1 id="logo"><a href="/"><img src="{{STATIC_URL}}gfx/skittle-logo3.png"><span>DNA</span>Skittle</a></h1>
 	
 	<header>
+			{% block usertools %}
+			<div id="usertools">
+				{% if user.is_authenticated %}
+				Welcome {% firstof user.FirstName user.LastName user %}<br />
+				<a href="{% url 'logout' %}">Logout</a><br />
+				<a href="{% url 'index' %}?user={{ user|urlencode }}">My Genomes</a>
+				{% else %}
+				Welcome<br/>
+				<a href="{% url 'login' %}" id="loginLink">Login</a>
+				{% endif %}
+			</div>
+			{% endblock %}
+			{% block header %}
 		<ul>
-			<li><a href="/discover">Discover</a></li><!-- <li><a>Share</a></li> --><li><a href="/learn">Learn</a></li>
+			<li><a href="/discover">Select Genome</a></li><li><a href="/learn">Demo</a></li>
 		</ul>
-		<p><a href="https://twitter.com/genome_skittle" target="blank"><img src="{{STATIC_URL}}gfx/twitter-bird-dark-bgs.png" height="36" width="36"></a><a href="https://plus.google.com/u/0/113106795968395476024/about" target="blank"><img src="{{STATIC_URL}}gfx/gplus-white-26.png" height="26" width="26"></a>
-			<a href="https://github.com/josiahseaman/skittle" target="blank"><img src="{{STATIC_URL}}gfx/github-white.png" height="22"></a></p>
-	</header>
 	{% endblock %}
+
+	</header>
 	{% block content %}
 	<div id="canvasContainer">
 	    <canvas id="c" width="2000" height="1000"></canvas>
@@ -71,7 +80,9 @@
 			<li class="radio-tools" data-tool="Annotate"><img src="{{STATIC_URL}}gfx/icons/39.png" width="20" height="20">Annotate</li> -->
 			<li id="link-here"><img src="{{STATIC_URL}}gfx/icons/flag.png" width="20" height="20">Link Here</li>
 			<!-- <li><img src="{{STATIC_URL}}gfx/icons/camera.png" width="20" height="20">Screenshot</li> -->
+			<div class="bottom">
 			<li class="bottom"><img src="{{STATIC_URL}}gfx/icons/cog.png" width="20" height="20">Settings</li>
+			</div>
 		</ul>
 	</div>
 	<div id="dials">
@@ -107,6 +118,28 @@
 		</ul>
 	</div>
 
+
+{% endblock %}
+{% block login %}
+	<div class="popover" id="login">
+		<h3>Login</h3><a href="#" onClick="$(this).parent().hide()">&times;</a>
+		<form method="post" action="{% url 'django.contrib.auth.views.login' %}">
+		{% csrf_token %}
+		<table>
+		<tr>
+		    <td>{{ form.username.label_tag }}</td>
+		    <td>{{ form.username }}</td>
+		</tr>
+		<tr>
+		    <td>{{ form.password.label_tag }}</td>
+		    <td>{{ form.password }}</td>
+		</tr>
+		</table>
+
+		<input type="submit" value="login" />
+		<input type="hidden" name="next" value="{{ next }}" />
+		</form>
+	</div>
 {% endblock %}
 
 {% if PRODUCTION %}
