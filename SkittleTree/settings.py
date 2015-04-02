@@ -14,13 +14,13 @@ CHUNK_SIZE = 65536
 #--------------------
 
 if PRODUCTION and not HOSTNAME.startswith('nyx'):
-    SKITTLE_TREE_LOC = "/var/www/skittle/"
+    SKITTLE_TREE_LOC = "/home/projects/skittle/"
 
-    SKITTLE_TREE_URL = "https://dnaskittle.com/"
+    SKITTLE_TREE_URL = "http://dnaskittle.com/"
 elif HOSTNAME.startswith('nyx'):
     SKITTLE_TREE_LOC = "/var/www/skittle-development/"
 
-    SKITTLE_TREE_URL = "https://skittle.newlinetechnicalinnovations.com/"
+    SKITTLE_TREE_URL = "http://skittle.newlinetechnicalinnovations.com/"
 else:
     SKITTLE_TREE_LOC = os.getcwd().replace("\\", "/") + "/"
     SKITTLE_TREE_URL = "/"
@@ -42,12 +42,12 @@ if PRODUCTION and not HOSTNAME.startswith('nyx'):
     #TODO: mysql_pool
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-            'NAME': 'DNASkittle', # Or path to database file if using sqlite3.
+            'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+            'NAME': 'dnaskittle', # Or path to database file if using sqlite3.
             'USER': 'skittle', # Not used with sqlite3.
             'PASSWORD': 'sk!77l3PandaDatabase%', # Not used with sqlite3.
-            'HOST': '127.0.0.1', # Set to empty string for localhost. Not used with sqlite3.
-            'PORT': '3306', # Set to empty string for default. Not used with sqlite3.
+            'HOST': '', # Set to empty string for localhost. Not used with sqlite3.
+            'PORT': '', # Set to empty string for default. Not used with sqlite3.
         }
     }
 
@@ -67,9 +67,9 @@ else:
 DATABASE_WAIT_TIMEOUT = 28800
 
 if PRODUCTION or HOSTNAME.startswith('nyx'):
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    ENABLE_SSL = True
+    #SESSION_COOKIE_SECURE = True
+    #CSRF_COOKIE_SECURE = True
+    #ENABLE_SSL = True
     SESSION_SAVE_EVERY_REQUEST = True
     SESSION_COOKIE_NAME = 'DNASkittle'
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -204,6 +204,8 @@ INSTALLED_APPS = (
     'DNAStorage',
     'Annotations',
     'Utilities',
+
+    'productionserver',
 
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
